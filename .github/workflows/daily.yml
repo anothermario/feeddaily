@@ -1,0 +1,46 @@
+name: Daily Briefing
+
+on:
+  schedule:
+    - cron: '0 5 * * *'  # 06:00 Vienna time (UTC+1)
+  workflow_dispatch:       # allows manual trigger from GitHub
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+      pages: write
+      id-token: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          pip install feedparser youtube-transcript-api anthropic markdown python-dotenv
+
+      - name: Generate briefing
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: python feeddaily.py
+
+      - name: Commit and push briefing
+        run: |
+          git config user.name "FeedDaily Bot"
+          git config user.email "bot@feeddaily"
+          git add docs/
+          git diff --staged --quiet || git commit -m "Briefing $(date +'%Y-%m-%d')"
+          git push
+
+      - name: Deploy to GitHub Pages
+        uses: actions/deploy-pages@v4
+        with:
+          folder: docs

@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#0f1117">
+<title>FeedDaily</title>
+<link rel="manifest" href="manifest.json">
+<style>
+  :root {
+    --bg: #0f1117;
+    --card: #1a1d27;
+    --border: #2e3147;
+    --text: #e2e8f0;
+    --muted: #8892a4;
+    --accent: #6366f1;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    min-height: 100vh;
+  }
+
+  /* PIN SCREEN */
+  #pin-screen {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    gap: 1.5rem;
+    padding: 2rem;
+  }
+  #pin-screen h1 { font-size: 2rem; }
+  #pin-screen p { color: var(--muted); }
+  #pin-input {
+    background: var(--card);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-size: 1.2rem;
+    padding: 0.75rem 1.5rem;
+    border-radius: 8px;
+    width: 100%;
+    max-width: 300px;
+    text-align: center;
+    outline: none;
+  }
+  #pin-input:focus { border-color: var(--accent); }
+  #pin-btn {
+    background: var(--accent);
+    color: white;
+    border: none;
+    padding: 0.75rem 2rem;
+    border-radius: 8px;
+    font-size: 1rem;
+    cursor: pointer;
+    width: 100%;
+    max-width: 300px;
+  }
+  #pin-error { color: #f87171; font-size: 0.9rem; display: none; }
+
+  /* MAIN APP */
+  #app { display: none; }
+  .header {
+    background: var(--card);
+    border-bottom: 1px solid var(--border);
+    padding: 1rem 1.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+  .header h1 { font-size: 1.2rem; }
+  .tabs {
+    display: flex;
+    gap: 0.5rem;
+  }
+  .tab {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    padding: 0.4rem 1rem;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.85rem;
+  }
+  .tab.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: white;
+  }
+
+  /* CONTENT */
+  #content { padding: 1.5rem; max-width: 900px; margin: 0 auto; }
+  #briefing-frame {
+    width: 100%;
+    border: none;
+    min-height: 80vh;
+    background: transparent;
+  }
+
+  /* ARCHIVE */
+  #archive-list { display: flex; flex-direction: column; gap: 0.75rem; }
+  .archive-item {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1rem 1.25rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    transition: border-color 0.15s;
+  }
+  .archive-item:hover { border-color: var(--accent); }
+  .archive-date { font-weight: 600; }
+  .archive-arrow { color: var(--muted); }
+  .back-btn {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 0.4rem 1rem;
+    border-radius: 6px;
+    cursor: pointer;
+    margin-bottom: 1rem;
+    font-size: 0.85rem;
+  }
+</style>
+</head>
+<body>
+
+<!-- PIN SCREEN -->
+<div id="pin-screen">
+  <h1>📰 FeedDaily</h1>
+  <p>Enter your passphrase to continue</p>
+  <input id="pin-input" type="password" placeholder="passphrase" autocomplete="off">
+  <button id="pin-btn">Unlock</button>
+  <span id="pin-error">Wrong passphrase — try again</span>
+</div>
+
+<!-- MAIN APP -->
+<div id="app">
+  <div class="header">
+    <h1>📰 FeedDaily</h1>
+    <div class="tabs">
+      <button class="tab active" onclick="showToday()">Today</button>
+      <button class="tab" onclick="showArchive()">Archive</button>
+    </div>
+  </div>
+  <div id="content">
+    <iframe id="briefing-frame" src=""></iframe>
+    <div id="archive-view" style="display:none;">
+      <div id="archive-list"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ── CONFIG ──────────────────────────────────────────────
+  const PASSPHRASE = "feeddaily"; // change this to your chosen word
+  const SESSION_KEY = "fd_auth";
+
+  // ── AUTH ────────────────────────────────────────────────
+  function checkAuth() {
+    if (sessionStorage.getItem(SESSION_KEY) === "1") unlock();
+  }
+
+  document.getElementById("pin-btn").onclick = tryUnlock;
+  document.getElementById("pin-input").addEventListener("keydown", e => {
+    if (e.key === "Enter") tryUnlock();
+  });
+
+  function tryUnlock() {
+    const val = document.getElementById("pin-input").value.trim().toLowerCase();
+    if (val === PASSPHRASE) {
+      sessionStorage.setItem(SESSION_KEY, "1");
+      unlock();
+    } else {
+      document.getElementById("pin-error").style.display = "block";
+      document.getElementById("pin-input").value = "";
+    }
+  }
+
+  function unlock() {
+    document.getElementById("pin-screen").style.display = "none";
+    document.getElementById("app").style.display = "block";
+    showToday();
+  }
+
+  // ── NAVIGATION ──────────────────────────────────────────
+  function showToday() {
+    setActiveTab(0);
+    document.getElementById("briefing-frame").style.display = "block";
+    document.getElementById("archive-view").style.display = "none";
+    const today = new Date().toISOString().split("T")[0];
+    document.getElementById("briefing-frame").src = `briefing_${today}.html`;
+  }
+
+  function showArchive() {
+    setActiveTab(1);
+    document.getElementById("briefing-frame").style.display = "none";
+    document.getElementById("archive-view").style.display = "block";
+    loadArchive();
+  }
+
+  function setActiveTab(i) {
+    document.querySelectorAll(".tab").forEach((t, idx) => {
+      t.classList.toggle("active", idx === i);
+    });
+  }
+
+  // ── ARCHIVE ─────────────────────────────────────────────
+  async function loadArchive() {
+    const list = document.getElementById("archive-list");
+    list.innerHTML = "<p style='color:var(--muted)'>Loading archive...</p>";
+    try {
+      const res = await fetch("archive.json");
+      const dates = await res.json();
+      list.innerHTML = "";
+      dates.reverse().forEach(date => {
+        const item = document.createElement("div");
+        item.className = "archive-item";
+        item.innerHTML = `<span class="archive-date">📅 ${date}</span><span class="archive-arrow">→</span>`;
+        item.onclick = () => openArchiveItem(date);
+        list.appendChild(item);
+      });
+    } catch {
+      list.innerHTML = "<p style='color:var(--muted)'>No archive yet.</p>";
+    }
+  }
+
+  function openArchiveItem(date) {
+    setActiveTab(1);
+    document.getElementById("archive-view").style.display = "none";
+    document.getElementById("briefing-frame").style.display = "block";
+    document.getElementById("briefing-frame").src = `briefing_${date}.html`;
+
+    // Add back button
+    const backBtn = document.createElement("button");
+    backBtn.className = "back-btn";
+    backBtn.textContent = "← Back to Archive";
+    backBtn.onclick = showArchive;
+    document.getElementById("content").prepend(backBtn);
+  }
+
+  checkAuth();
+</script>
+</body>
+</html>
