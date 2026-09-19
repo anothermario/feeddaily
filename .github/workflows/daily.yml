@@ -3,7 +3,7 @@ name: Daily Briefing
 on:
   schedule:
     - cron: '0 5 * * *'  # 06:00 Vienna time (UTC+1)
-  workflow_dispatch:       # allows manual trigger from GitHub
+  workflow_dispatch:
 
 jobs:
   generate:
@@ -32,7 +32,7 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: python feeddaily.py
 
-      - name: Commit and push briefing
+      - name: Commit briefing files
         run: |
           git config user.name "FeedDaily Bot"
           git config user.email "bot@feeddaily"
@@ -40,7 +40,21 @@ jobs:
           git diff --staged --quiet || git commit -m "Briefing $(date +'%Y-%m-%d')"
           git push
 
-      - name: Deploy to GitHub Pages
-        uses: actions/deploy-pages@v4
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
         with:
-          folder: docs
+          path: docs/
+
+  deploy:
+    needs: generate
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
